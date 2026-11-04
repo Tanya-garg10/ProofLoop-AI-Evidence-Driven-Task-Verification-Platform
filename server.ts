@@ -38,7 +38,9 @@ const UPLOADS_DIR = path.resolve(__dirname, 'uploads');
 if (!fs.existsSync(UPLOADS_DIR)) {
   fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 }
+const DEMO_IMAGES_DIR = path.resolve(__dirname, 'src', 'assets', 'images');
 app.use('/uploads', express.static(UPLOADS_DIR));
+app.use('/src/assets/images', express.static(DEMO_IMAGES_DIR));
 
 // Configure multer for evidence uploads
 const storage = multer.diskStorage({
@@ -80,7 +82,7 @@ function readEvidenceImage(fileUrl: string): Buffer {
     if (!fileName || fileName !== fileUrl.slice('/src/assets/images/'.length)) {
       throw new Error('Invalid evidence file reference.');
     }
-    filePath = path.join(__dirname, 'src', 'assets', 'images', fileName);
+    filePath = path.join(DEMO_IMAGES_DIR, fileName);
   } else {
     throw new Error('Evidence file is not available for analysis.');
   }
@@ -636,7 +638,7 @@ app.post('/api/ai/test/:model', async (req, res) => {
       return res.json({ success: true, model: META_MODELS.museSpark });
     }
     if (req.params.model === 'sam') {
-      const samplePath = path.join(__dirname, 'src', 'assets', 'images', 'demo_chairs_arranged_1793784151109.jpg');
+      const samplePath = path.join(DEMO_IMAGES_DIR, 'demo_chairs_arranged_1793784151109.jpg');
       const result = await testSamConnection(fs.readFileSync(samplePath));
       return res.json({ success: true, model: META_MODELS.sam, segmentCount: result.detections.length });
     }
