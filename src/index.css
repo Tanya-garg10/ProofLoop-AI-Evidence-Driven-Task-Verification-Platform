@@ -104,3 +104,32 @@
 .bg-radial-glow {
   background: radial-gradient(circle at 50% 0%, rgba(139, 124, 255, 0.08) 0%, rgba(98, 220, 235, 0.02) 40%, transparent 70%);
 }
+
+@media print {
+  @page {
+    margin: 14mm;
+  }
+
+  .print-report-layout,
+  .print-report-shell,
+  .print-report-main {
+    display: block !important;
+    width: 100% !important;
+    min-height: 0 !important;
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+
+  .print-report-document {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: #fff !important;
+    color: #000 !important;
+  }
+}

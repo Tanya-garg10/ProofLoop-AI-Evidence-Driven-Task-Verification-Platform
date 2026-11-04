@@ -82,7 +82,7 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
       initial={false}
       animate={{ width: collapsed ? 72 : 236 }}
       transition={{ duration: 0.2, ease: 'easeOut' }}
-      className="hidden md:flex flex-col bg-[#080A10] border-r border-[rgba(148,163,184,0.08)] select-none shrink-0 h-screen sticky top-0 z-30"
+      className="hidden md:flex print:hidden flex-col bg-[#080A10] border-r border-[rgba(148,163,184,0.08)] select-none shrink-0 h-screen sticky top-0 z-30"
     >
       {/* 1. Rail Brand Header */}
       <div className="h-14 flex items-center justify-between px-3.5 border-b border-[rgba(148,163,184,0.08)]">

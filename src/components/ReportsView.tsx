@@ -60,7 +60,7 @@ export const ReportsView: React.FC = () => {
       </div>
 
       {/* Printable Report Document Surface */}
-      <div className="p-8 sm:p-12 rounded-2xl bg-[#0D1321] border border-neutral-800 space-y-8 print:bg-white print:text-black print:border-none print:p-0">
+      <div className="print-report-document p-8 sm:p-12 rounded-2xl bg-[#0D1321] border border-neutral-800 space-y-8 print:bg-white print:text-black print:border-none print:p-0">
         {/* Document Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-neutral-800 print:border-neutral-300">
           <div>

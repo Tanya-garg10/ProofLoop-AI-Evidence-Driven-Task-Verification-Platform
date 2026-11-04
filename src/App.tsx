@@ -72,7 +72,7 @@ export function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#080A10] text-[#F8FAFC] flex flex-col font-sans">
+    <div className={`min-h-screen bg-[#080A10] text-[#F8FAFC] flex flex-col font-sans ${currentView === 'reports' ? 'print-report-layout' : ''}`}>
       {/* If Landing Page is active, display full marketing showcase */}
       {currentView === 'landing' ? (
         <div className="flex flex-col min-h-screen">
@@ -100,7 +100,7 @@ export function App() {
         </div>
       ) : (
         /* Enterprise Multi-Screen App Layout with Compact Navigation Rail */
-        <div className="flex flex-1 min-h-screen overflow-hidden">
+        <div className={`flex flex-1 min-h-screen overflow-hidden ${currentView === 'reports' ? 'print-report-shell' : ''}`}>
           <NavigationRail
             currentView={currentView}
             onNavigate={(view) => {
@@ -114,7 +114,7 @@ export function App() {
             onOpenSettings={() => setShowSettings(true)}
           />
 
-          <main className="flex-1 overflow-y-auto min-h-screen">
+          <main className={`flex-1 overflow-y-auto min-h-screen ${currentView === 'reports' ? 'print-report-main' : ''}`}>
             {currentView === 'command-center' && (
               <CommandCenterView
                 onSelectProject={handleOpenProject}
