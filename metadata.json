@@ -1,0 +1,6 @@
+{
+  "name": "ProofLoop AI",
+  "description": "Evidence-driven AI execution and verification platform: transform operational instructions into verified outcomes with multimodal AI inspection.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
