@@ -19,7 +19,7 @@ import {
   ChevronDown,
   Building2,
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion';
+import { motion, AnimatePresence } from 'motion/react';
 import type { User } from '../types/index.js';
 
 interface NavigationRailProps {

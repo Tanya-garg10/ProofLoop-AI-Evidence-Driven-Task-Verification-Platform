@@ -30,7 +30,7 @@
 
 ## What is ProofLoop AI?
 
-ProofLoop AI is an evidence-driven AI execution and verification platform. It transforms natural-language operational directives into measurable acceptance criteria, gathers real-world photographic evidence from field teams, and applies multi-agent AI inspection (SAM 3.1 segmentation + Gemini 3.8 Flash reasoning) to verify that required physical work has actually been completed — before anyone can mark it done.
+ProofLoop AI is an evidence-driven AI execution and verification platform. It turns operational directives into measurable criteria with Muse Spark, analyzes uploaded images using actual SAM 3.1 segmentations, and applies conservative evidence reasoning before routing uncertain outcomes to a human reviewer.
 
 > **Core Principle:** A task must never be marked verified just because someone clicked a checkbox.
 > Verification requires empirical, photographic, cryptographically anchored evidence.
@@ -52,8 +52,9 @@ ProofLoop AI is an evidence-driven AI execution and verification platform. It tr
    │  STAGE 01        │  │  STAGE 02        │  │  STAGE 03        │
    │  Planning Agent  │  │  Visual Intel    │  │  Compliance      │
    │                  │──│                  │──│  Agent           │
-   │  Gemini 3.8      │  │  SAM 3.1 ViT-H  │  │                  │
-   │  Flash           │  │  Segmentation    │  │  Zero-Fabrication│
+   │  Muse Spark 1.3  │  │  SAM 3.1        │  │  Muse Spark      │
+   │  Task Planning   │  │  Segmentation   │  │  Evidence Review │
+   │                  │──│                  │──│  Zero-Fabrication│
    │                  │  │                  │  │  Guardrail       │
    └──────────────────┘  └──────────────────┘  └────────┬─────────┘
                                                         │
@@ -71,10 +72,10 @@ ProofLoop AI is an evidence-driven AI execution and verification platform. It tr
 
 | Stage | Agent | Model | Responsibility |
 |-------|-------|-------|----------------|
-| 01 | **Planning Agent** | Gemini 3.8 Flash | Decomposes directives into discrete tasks with binary acceptance criteria and photographic evidence requirements |
-| 02 | **Visual Intelligence Agent** | Meta SAM 3.1 ViT-H | Multi-object segmentation, bounding-box extraction, spatial coordinate computation, confidence scoring |
-| 03 | **Compliance Agent** | Rule Engine v2.6 | Requirement-to-evidence corroboration, non-visual gap discovery, zero-fabrication guardrail enforcement |
-| 04 | **Verification Agent** | Synthesis Protocol v3.1 | Verdict synthesis (VERIFIED / NEEDS_REVIEW), SHA-256 cryptographic ledger commit, human review routing |
+| 01 | **Planning Agent** | Muse Spark 1.3 | Produces structured task plans with measurable criteria and evidence requirements |
+| 02 | **Visual Intelligence Agent** | SAM 3.1 | Segments one prompted object concept per request and returns actual boxes and pixel masks |
+| 03 | **Evidence Reasoner** | Muse Spark 1.3 + guardrails | Evaluates each criterion against actual segmentation findings and records uncertainty |
+| 04 | **Verification Agent** | Verification orchestrator | Routes unsupported/non-visual criteria to human review and persists review decisions |
 
 ---
 
@@ -86,7 +87,7 @@ ProofLoop AI is an evidence-driven AI execution and verification platform. It tr
 | **3D Engine** | Three.js r187 with OrbitControls |
 | **Build** | Vite 8 with HMR |
 | **Backend** | Express 4, Node.js with tsx runtime |
-| **AI** | Google Gemini 3.8 Flash (`@google/genai`), Meta SAM 3.1 |
+| **AI** | Meta Model API (`openai` compatible SDK), Muse Spark 1.3, SAM 3.1, Muse Voice Transcribe 1.0, optional Muse Image 1.0 |
 | **Auth** | JWT (jsonwebtoken), bcryptjs |
 | **Upload** | Multer (multipart photo evidence) |
 | **Fonts** | Space Grotesk (display), Inter (interface), JetBrains Mono (code/data) |
@@ -99,7 +100,7 @@ ProofLoop AI is an evidence-driven AI execution and verification platform. It tr
 Real-time operational intelligence dashboard. Project readiness index, multi-segment verification progress bar, attention-required task feed, AI engine telemetry, risk radar signals, and a rich audit timeline — all in an asymmetric editorial layout.
 
 ### Evidence Studio ★
-The signature interface. A professional image-inspection workstation with a large central image viewer, SAM 3.1 bounding-box overlays with corner crosshairs, original/analyzed/side-by-side view switching, adjustable confidence threshold, right-side criteria inspector with pass/fail telemetry, uncertainty callouts, and a bottom evidence history strip.
+The signature interface. A professional image-inspection workstation with a large central image viewer, actual SAM 3.1 mask and box overlays, original/analyzed/side-by-side view switching, an object prompt selector, confidence filtering when the API reports confidence, criteria inspector, and evidence history.
 
 ### Agent Control Room
 Connected 4-stage execution pipeline visualization. Each agent card shows model, status, and role. Below: filterable execution telemetry feed with input/output data boxes, latency metrics, and target task links.
@@ -108,7 +109,7 @@ Connected 4-stage execution pipeline visualization. Each agent card shows model,
 Interactive 3D venue model (Three.js) with 5 physical zones — Registration, Seating, Stage, Emergency Egress, Wayfinding. Supports raycaster zone selection, camera angle presets (Overview / Stage / Entrance / Exit), and a 2D architectural blueprint fallback. Selecting a zone opens its linked task, evidence photo, and verification status.
 
 ### AI Planner
-Natural-language directive input. Gemini 3.8 Flash decomposes instructions into structured task plans with acceptance criteria, evidence requirements, dependencies, and priority levels.
+Natural-language directive input. Muse Spark returns schema-validated plans that can be edited, revised, and approved before tasks are saved. Voice instructions are transcribed by Muse Voice and shown for user confirmation before planning.
 
 ### Verification Center
 Review queue for flagged tasks. Human reviewers (e.g. Dr. Sarah Chen, REVIEWER role) can approve, reject, or request more evidence. Every decision is stored alongside the AI result.
@@ -123,15 +124,15 @@ Tamper-evident audit trail. Every event (task creation, evidence upload, AI anal
 Printable executive operations compliance report with verification status breakdowns, risk summaries, and audit chain of custody.
 
 ### AI Connections
-Engine status dashboard showing Gemini and SAM 3.1 connectivity, model versions, and provider health.
+Live Meta Model API configuration status, explicit connection tests, model IDs, last successful requests, and persisted request execution history. A model is not shown connected until a real API call succeeds.
 
 ---
 
 ## Demo Scenario: College Tech Fest 2026
 
-The application ships with a pre-loaded operational scenario:
+The application ships with a pre-loaded illustrative scenario. Seeded findings and verification narratives are demo data, not live model results. The Evidence Studio labels images without a real segmentation as unanalyzed; verification requires fresh API-generated segmentation.
 
-| # | Task | Zone | Status | AI Finding |
+| # | Task | Zone | Illustrative seed status | Demo narrative (not a live model finding) |
 |---|------|------|--------|------------|
 | 1 | Arrange 50 conference chairs in main auditorium | `SEATING_ZONE` | ✅ VERIFIED | SAM 3.1 segmented 50 chairs in 5 rows of 10. Central aisle 2.4m clear. |
 | 2 | Install main laser projector on ceiling mount | `PROJECTOR_STAGE` | ⚠️ NEEDS_REVIEW | Mount bracket detected with power LED active. HDMI signal transmission unverifiable from static photo. *Zero-fabrication guardrail triggered.* |
@@ -181,6 +182,19 @@ POST /api/tasks/:id/evidence            — Upload photo evidence (multipart)
 GET  /api/tasks/:id/evidence            — Get evidence items
 POST /api/tasks/:id/verify              — Trigger AI verification pipeline
 POST /api/tasks/:id/evidence/preset     — Upload preset demo evidence
+POST /api/evidence/:id/segment          — Segment one or more object prompts
+```
+
+### Meta Model API
+```
+POST /api/ai/plan                       — Plan instructions with Muse Spark
+POST /api/ai/revise                     — Revise a draft without overwriting prior tasks
+POST /api/ai/transcribe                 — Transcribe WAV audio with Muse Voice
+POST /api/ai/image                      — Generate optional artwork (never evidence)
+GET  /api/ai/status                     — Configuration and last real operation status
+POST /api/ai/test/muse-spark            — Live Muse Spark connection test
+POST /api/ai/test/sam                   — Live SAM segmentation test on a bundled image
+GET  /api/ai/executions                 — Persisted API execution history
 ```
 
 ### Multi-Agent Orchestration
@@ -229,15 +243,19 @@ POST /api/demo/reset                    — Reset to baseline demo state
 Create a `.env` file in the project root:
 
 ```env
-# Required for AI features (planning, verification, vision analysis)
-GEMINI_API_KEY=your_gemini_api_key
+# Meta Model API key: server-side only; never expose it to frontend code.
+MODEL_API_KEY=your_meta_model_api_key
+META_BASE_URL=https://api.meta.ai/v1
+MUSE_SPARK_MODEL=muse-spark-1.3
+SAM_MODEL=sam-3.1
+MUSE_VOICE_MODEL=muse-voice-transcribe-1.0
+MUSE_IMAGE_MODEL=muse-image-1.0
 
-# Optional
-META_API_KEY=your_meta_api_key
+# Optional app setting
 JWT_SECRET=your_jwt_secret
 ```
 
-> Without `GEMINI_API_KEY`, the platform runs in simulation mode using pre-seeded demo data.
+Without `MODEL_API_KEY`, live AI operations report `CONFIGURATION_REQUIRED`. Illustrative seed assets are marked as demo data and are not treated as model-generated results or verification.
 
 ### Install & Run
 
@@ -245,7 +263,7 @@ JWT_SECRET=your_jwt_secret
 # Install dependencies
 npm install
 
-# Start development server (frontend + backend on port 3000)
+# Start development server (frontend + backend on port 3001)
 npm run dev
 
 # Production build
@@ -253,7 +271,41 @@ npm run build
 npm start
 ```
 
-Open **http://localhost:3000** in your browser.
+Open **http://localhost:3001** in your browser.
+
+### Meta Model API integration
+
+The backend reads `MODEL_API_KEY` and calls the official `https://api.meta.ai/v1` API through the OpenAI-compatible SDK. Never add the key to frontend environment variables or return it from an endpoint.
+
+| Model | Default ID | Responsibility |
+|-------|------------|----------------|
+| Muse Spark | `muse-spark-1.3` | Structured task planning, draft revision, and criterion-by-criterion evidence reasoning |
+| SAM 3.1 | `sam-3.1` | Actual image segmentation; one concept per request, parsed with `@meta-sam/parser` |
+| Muse Voice Transcribe | `muse-voice-transcribe-1.0` | Speech-to-text for WAV recordings; transcript is user-confirmed before planning |
+| Muse Image | `muse-image-1.0` | Optional illustrative artwork, explicitly marked as not evidence |
+
+Workflow: **instruction (typed or confirmed transcript) → Muse Spark plan → human edit/approval → evidence upload → SAM object masks and boxes → Muse Spark criterion reasoning → deterministic uncertainty guardrails → human review and persisted decision.**
+
+Example planning request:
+
+```http
+POST /api/ai/plan
+Content-Type: application/json
+
+{"instructions":"Arrange 50 chairs and keep emergency exits unobstructed.","context":"College auditorium","projectName":"Tech Fest"}
+```
+
+The response contains a validated `projectName`, `summary`, and `tasks` array. The UI lets the user edit and revise the draft before committing tasks. `POST /api/tasks/:id/verify` only uses evidence with a real SAM result; static images do not verify device operation, complete counts, or exit access from all angles.
+
+Connection tests make real model requests (and may incur usage). Retry is limited to transient failures and rate limits. Usage tokens are persisted when the API returns them; prompts and secrets are not written to execution logs. Review current [pricing and rate limits](https://dev.meta.ai/docs/pricing-rate-limits) before enabling production traffic.
+
+Limitations: SAM returns zero matches as a valid empty result; each segmentation prompt must describe one object concept. Current voice recording uploads WAV and is subject to Meta's supported duration/file limits. A still photo cannot establish temporal/electrical operation, a complete count from a partial view, or safety from unseen viewpoints. Muse Image outputs are artwork, never proof.
+
+Official docs: [API overview](https://dev.meta.ai/docs/overview) · [Models](https://dev.meta.ai/docs/models) · [SAM overview](https://dev.meta.ai/docs/sam/overview)
+
+### Tests
+
+Run `npm test` for mocked unit tests covering planning/validation, retries and safe failures, SAM parsing/masks/zero matches, WAV transcription, verification guardrails, and review persistence. These tests do not call live Meta services. Run `npm run lint` and `npm run build` for type/build validation.
 
 ---
 
@@ -265,10 +317,17 @@ proofloop-ai/
 ├── server/
 │   ├── db.ts                    # In-memory JSON database with demo seed data
 │   └── services/
-│       ├── aiServices.ts        # Gemini 3.8 Flash + SAM 3.1 integration
+│       ├── aiServices.ts        # Exports the model-specific Meta services
 │       ├── orchestrator.ts      # 4-agent pipeline orchestration engine
 │       ├── riskEngine.ts        # Deterministic risk scoring engine
 │       └── trustLedger.ts       # SHA-256 cryptographic audit ledger
+│   ├── src/services/meta/
+│   │   ├── metaClient.ts        # Auth, retries, safe errors, execution logging
+│   │   ├── museSparkService.ts  # Planning, revision, and evidence reasoning
+│   │   ├── samService.ts        # Actual segmentation parsing and masks
+│   │   ├── museVoiceService.ts  # WAV transcription
+│   │   ├── museImageService.ts  # Optional non-evidence artwork
+│   │   └── verificationOrchestrator.ts
 ├── src/
 │   ├── main.tsx                 # React entry point
 │   ├── App.tsx                  # Root router + view state management
@@ -341,6 +400,6 @@ Private. All rights reserved.
 
 **ProofLoop AI** · The Evidence OS · 2026
 
-*Powered by SAM 3.1 & Gemini 3.8 Flash*
+*Powered by Meta Muse Spark, SAM 3.1, and Muse Voice Transcribe*
 
 </div>

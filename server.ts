@@ -1,22 +1,32 @@
+import 'dotenv/config';
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
-import dotenv from 'dotenv';
 import multer from 'multer';
 import jwt from 'jsonwebtoken';
 import { createServer as createViteServer } from 'vite';
 import { db, DEMO_USERS } from './server/db.js';
-import { aiServiceManager } from './server/services/aiServices.js';
 import { agentEngine } from './server/services/orchestrator.js';
 import { riskEngine } from './server/services/riskEngine.js';
 import { trustLedgerService } from './server/services/trustLedger.js';
-
-dotenv.config();
+import { getMetaApiStatus } from './server/src/services/meta/aiStatus.js';
+import {
+  MetaConfigurationError,
+  META_MODELS,
+  isMetaConfigured,
+  safeMetaError,
+} from './server/src/services/meta/metaClient.js';
+import { planInstructions, revisePlan, testMuseSparkConnection } from './server/src/services/meta/museSparkService.js';
+import { generateIllustration } from './server/src/services/meta/museImageService.js';
+import { segmentImage, promptsForTask, testSamConnection } from './server/src/services/meta/samService.js';
+import { transcribeWav } from './server/src/services/meta/museVoiceService.js';
+import { verifyTaskEvidence } from './server/src/services/meta/verificationOrchestrator.js';
+import type { SamDetection } from './src/types/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const PORT = 3000;
+const PORT = 3001;
 const JWT_SECRET = process.env.JWT_SECRET || 'proofloop_secret_dev_key_2026';
 
 const app = express();
@@ -44,7 +54,38 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage,
   limits: { fileSize: 25 * 1024 * 1024 }, // 25 MB max
+  fileFilter: (_req, file, cb) => {
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)) {
+      cb(new Error('Evidence uploads must be JPEG, PNG, or WebP images.'));
+      return;
+    }
+    cb(null, true);
+  },
 });
+const audioUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 32 * 1024 * 1024 },
+});
+
+function readEvidenceImage(fileUrl: string): Buffer {
+  let filePath: string;
+  if (fileUrl.startsWith('/uploads/')) {
+    const fileName = path.basename(fileUrl);
+    if (!fileName || fileName !== fileUrl.slice('/uploads/'.length)) {
+      throw new Error('Invalid evidence file reference.');
+    }
+    filePath = path.join(UPLOADS_DIR, fileName);
+  } else if (fileUrl.startsWith('/src/assets/images/')) {
+    const fileName = path.basename(fileUrl);
+    if (!fileName || fileName !== fileUrl.slice('/src/assets/images/'.length)) {
+      throw new Error('Invalid evidence file reference.');
+    }
+    filePath = path.join(__dirname, 'src', 'assets', 'images', fileName);
+  } else {
+    throw new Error('Evidence file is not available for analysis.');
+  }
+  return fs.readFileSync(filePath);
+}
 
 // Authentication middleware helper
 function getUserFromToken(req: express.Request) {
@@ -195,17 +236,17 @@ app.post('/api/projects/:id/tasks', (req, res) => {
     description: description ? description.trim() : '',
     acceptanceCriteria: Array.isArray(acceptanceCriteria)
       ? acceptanceCriteria.map((c: any, idx: number) => ({
-          id: `crit-${Date.now()}-${idx}`,
-          text: typeof c === 'string' ? c : c.text,
-          status: 'PENDING',
-        }))
+        id: `crit-${Date.now()}-${idx}`,
+        text: typeof c === 'string' ? c : c.text,
+        status: 'PENDING',
+      }))
       : [
-          {
-            id: `crit-${Date.now()}-0`,
-            text: 'Operational execution completed and verified with photographic evidence',
-            status: 'PENDING',
-          },
-        ],
+        {
+          id: `crit-${Date.now()}-0`,
+          text: 'Operational execution completed and verified with photographic evidence',
+          status: 'PENDING',
+        },
+      ],
     evidenceRequirements: Array.isArray(evidenceRequirements) ? evidenceRequirements : ['Photographic evidence of completed work'],
     dependencies: Array.isArray(dependencies) ? dependencies : [],
     assignedTo: assignedUser?.id,
@@ -276,20 +317,62 @@ app.delete('/api/tasks/:id', (req, res) => {
 app.post('/api/ai/plan', async (req, res) => {
   try {
     const { instructions, context, projectName } = req.body;
-    if (!instructions || !instructions.trim()) {
+    if (typeof instructions !== 'string' || !instructions.trim()) {
       return res.status(400).json({ error: 'Instructions are required' });
     }
+    if (instructions.length > 20_000) {
+      return res.status(400).json({ error: 'Instructions must be 20,000 characters or fewer.' });
+    }
 
-    const plan = await aiServiceManager.planInstructions(
-      instructions.trim(),
-      context,
-      projectName
-    );
+    const plan = await planInstructions(instructions.trim(), context, projectName);
 
     return res.json(plan);
-  } catch (err: any) {
-    console.error('AI Planning error:', err);
-    return res.status(500).json({ error: err.message || 'Failed to generate task plan' });
+  } catch (err) {
+    console.error('AI planning failed:', safeMetaError(err));
+    return res.status(err instanceof MetaConfigurationError ? 503 : 502).json({ error: safeMetaError(err) });
+  }
+});
+
+app.post('/api/ai/revise', async (req, res) => {
+  const { currentPlan, revisionRequest } = req.body;
+  if (!currentPlan || typeof revisionRequest !== 'string' || !revisionRequest.trim()) {
+    return res.status(400).json({ error: 'An existing plan and revision request are required.' });
+  }
+  if (revisionRequest.length > 10_000) {
+    return res.status(400).json({ error: 'Revision requests must be 10,000 characters or fewer.' });
+  }
+  try {
+    const plan = await revisePlan(currentPlan, revisionRequest.trim());
+    return res.json(plan);
+  } catch (err) {
+    console.error('AI task revision failed:', safeMetaError(err));
+    return res.status(err instanceof MetaConfigurationError ? 503 : 502).json({ error: safeMetaError(err) });
+  }
+});
+
+app.post('/api/ai/transcribe', audioUpload.single('audio'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'A WAV audio recording is required.' });
+  try {
+    const result = await transcribeWav(req.file.buffer);
+    return res.json(result);
+  } catch (err) {
+    console.error('Voice transcription failed:', safeMetaError(err));
+    return res.status(err instanceof MetaConfigurationError ? 503 : 502).json({ error: safeMetaError(err) });
+  }
+});
+
+app.post('/api/ai/image', async (req, res) => {
+  const { prompt } = req.body;
+  if (typeof prompt !== 'string' || !prompt.trim()) {
+    return res.status(400).json({ error: 'An illustration prompt is required.' });
+  }
+  if (prompt.length > 2000) return res.status(400).json({ error: 'Prompts must be 2,000 characters or fewer.' });
+  try {
+    const result = await generateIllustration(prompt.trim());
+    return res.json({ ...result, isEvidence: false });
+  } catch (err) {
+    console.error('Illustration generation failed:', safeMetaError(err));
+    return res.status(err instanceof MetaConfigurationError ? 503 : 502).json({ error: safeMetaError(err) });
   }
 });
 
@@ -308,24 +391,43 @@ app.post('/api/tasks/:id/evidence', upload.single('file'), async (req, res) => {
     let fileUrl = '';
     let fileName = '';
     let fileSize = 0;
-    let fileType = 'image/jpeg';
+    let fileType = req.file?.mimetype || 'image/jpeg';
+    let imageBytes: Buffer;
 
     if (req.file) {
       fileUrl = `/uploads/${req.file.filename}`;
       fileName = req.file.originalname;
       fileSize = req.file.size;
       fileType = req.file.mimetype;
+      imageBytes = fs.readFileSync(req.file.path);
     } else if (req.body.presetUrl) {
-      // Allow selecting or reusing generated demo image
+      // Reuse a bundled demo image without claiming its contents were analyzed.
       fileUrl = req.body.presetUrl;
       fileName = req.body.fileName || 'inspected_evidence.jpg';
-      fileSize = 1500000;
+      imageBytes = readEvidenceImage(fileUrl);
+      fileSize = imageBytes.length;
     } else {
       return res.status(400).json({ error: 'No evidence file provided' });
     }
 
-    // Run SAM 3.1 visual segmentation on the evidence
-    const detections = await aiServiceManager.segmentImageEvidence(fileName, fileUrl, task.title);
+    let detections: SamDetection[] = [];
+    let analysisStatus: 'PENDING' | 'ANALYZED' | 'FAILED' = 'PENDING';
+    let analysisError: string | undefined;
+    let imageResolution = 'Unknown';
+    if (isMetaConfigured()) {
+      try {
+        const prompts = promptsForTask(task.title, task.description);
+        for (const prompt of prompts) {
+          const result = await segmentImage(imageBytes, fileType, prompt, `task:${task.id}:${fileName}`);
+          detections = detections.concat(result.detections);
+          imageResolution = `${result.imageWidth}x${result.imageHeight}`;
+        }
+        analysisStatus = 'ANALYZED';
+      } catch (err) {
+        analysisStatus = 'FAILED';
+        analysisError = safeMetaError(err);
+      }
+    }
 
     const evidenceItem = db.addEvidence({
       id: `ev-${Date.now()}`,
@@ -338,12 +440,14 @@ app.post('/api/tasks/:id/evidence', upload.single('file'), async (req, res) => {
       uploadedBy: currentUser.id,
       uploadedByName: currentUser.name,
       uploadedAt: new Date().toISOString(),
-      analysisStatus: 'ANALYZED',
+      analysisStatus,
       detections,
+      analysisError,
       metadata: {
         camera: req.body.camera || 'Field Lens Pro HD',
-        resolution: '4K Standard',
+        resolution: imageResolution,
         locationNote: req.body.locationNote || 'Inspection Site Primary Zone',
+        ...(analysisStatus === 'ANALYZED' ? { analysisModel: META_MODELS.sam } : {}),
       },
     });
 
@@ -354,13 +458,49 @@ app.post('/api/tasks/:id/evidence', upload.single('file'), async (req, res) => {
       actorId: currentUser.id,
       actorName: currentUser.name,
       action: 'EVIDENCE_UPLOADED',
-      details: `Uploaded evidence photo "${fileName}" (${(fileSize / (1024 * 1024)).toFixed(2)} MB). SAM 3.1 identified ${detections.length} key visual segments.`,
+      details: `Uploaded evidence photo "${fileName}" (${(fileSize / (1024 * 1024)).toFixed(2)} MB). Segmentation status: ${analysisStatus}; ${detections.length} actual segments returned.`,
     });
 
     return res.status(201).json(evidenceItem);
-  } catch (err: any) {
-    console.error('Evidence upload error:', err);
-    return res.status(500).json({ error: err.message || 'Failed to upload evidence' });
+  } catch (err) {
+    console.error('Evidence upload failed:', safeMetaError(err));
+    return res.status(500).json({ error: safeMetaError(err) });
+  }
+});
+
+app.post('/api/evidence/:id/segment', async (req, res) => {
+  const evidence = db.getEvidenceById(req.params.id);
+  if (!evidence) return res.status(404).json({ error: 'Evidence not found.' });
+  const prompts = req.body.prompts;
+  if (
+    !Array.isArray(prompts) ||
+    prompts.length === 0 ||
+    prompts.length > 8 ||
+    prompts.some((prompt) => typeof prompt !== 'string' || !prompt.trim() || prompt.length > 80 || /[,;\r\n]/.test(prompt))
+  ) {
+    return res.status(400).json({ error: 'Provide 1 to 8 short, single-concept object prompts.' });
+  }
+  try {
+    const bytes = readEvidenceImage(evidence.fileUrl);
+    const detections: SamDetection[] = [];
+    let imageResolution = evidence.metadata?.resolution || 'Unknown';
+    for (const prompt of [...new Set(prompts.map((item: string) => item.trim()))]) {
+      const result = await segmentImage(bytes, evidence.fileType, prompt, `evidence:${evidence.id}`);
+      detections.push(...result.detections);
+      imageResolution = `${result.imageWidth}x${result.imageHeight}`;
+    }
+    const updated = db.updateEvidence(evidence.id, {
+      analysisStatus: 'ANALYZED',
+      analysisError: undefined,
+      detections,
+      metadata: { ...evidence.metadata, resolution: imageResolution, analysisModel: META_MODELS.sam },
+    });
+    return res.json(updated);
+  } catch (err) {
+    const error = safeMetaError(err);
+    db.updateEvidence(evidence.id, { analysisStatus: 'FAILED', analysisError: error });
+    console.error('Evidence segmentation failed:', error);
+    return res.status(err instanceof MetaConfigurationError ? 503 : 502).json({ error });
   }
 });
 
@@ -413,7 +553,7 @@ app.post('/api/tasks/:id/verify', async (req, res) => {
     const evidenceItems = db.getEvidenceByTaskId(task.id);
     const currentUser = getUserFromToken(req) || DEMO_USERS[0];
 
-    const verification = await aiServiceManager.verifyTaskEvidence(task, evidenceItems);
+    const verification = await verifyTaskEvidence(task, evidenceItems);
     db.addVerification(verification);
 
     db.logAudit({
@@ -427,9 +567,9 @@ app.post('/api/tasks/:id/verify', async (req, res) => {
     });
 
     return res.json(verification);
-  } catch (err: any) {
-    console.error('Verification error:', err);
-    return res.status(500).json({ error: err.message || 'Verification execution failed' });
+  } catch (err) {
+    console.error('Verification failed:', safeMetaError(err));
+    return res.status(err instanceof MetaConfigurationError ? 503 : 502).json({ error: safeMetaError(err) });
   }
 });
 
@@ -455,8 +595,8 @@ app.post('/api/verification/:id/review', (req, res) => {
     humanDecision === 'APPROVED'
       ? 'HUMAN_REVIEW_APPROVED'
       : humanDecision === 'REJECTED'
-      ? 'HUMAN_REVIEW_REJECTED'
-      : 'HUMAN_REVIEW_REQUESTED_INFO';
+        ? 'HUMAN_REVIEW_REJECTED'
+        : 'HUMAN_REVIEW_REQUESTED_INFO';
 
   db.logAudit({
     projectId: updated.projectId,
@@ -476,9 +616,36 @@ app.get('/api/projects/:id/audit', (req, res) => {
   return res.json(logs);
 });
 
-// 10. AI Provider status
+// 10. Meta Model API status, live connection checks, and execution history
+app.get('/api/ai/status', (_req, res) => {
+  return res.json(getMetaApiStatus());
+});
+
 app.get('/api/ai/providers', (_req, res) => {
-  return res.json(aiServiceManager.getProviderStatus());
+  return res.json(getMetaApiStatus());
+});
+
+app.get('/api/ai/executions', (_req, res) => {
+  return res.json(db.getAIExecutions());
+});
+
+app.post('/api/ai/test/:model', async (req, res) => {
+  try {
+    if (req.params.model === 'muse-spark') {
+      await testMuseSparkConnection();
+      return res.json({ success: true, model: META_MODELS.museSpark });
+    }
+    if (req.params.model === 'sam') {
+      const samplePath = path.join(__dirname, 'src', 'assets', 'images', 'demo_chairs_arranged_1793784151109.jpg');
+      const result = await testSamConnection(fs.readFileSync(samplePath));
+      return res.json({ success: true, model: META_MODELS.sam, segmentCount: result.detections.length });
+    }
+    return res.status(400).json({ error: 'Select a supported connection test.' });
+  } catch (err) {
+    const error = safeMetaError(err);
+    console.error('AI connection test failed:', error);
+    return res.status(err instanceof MetaConfigurationError ? 503 : 502).json({ error });
+  }
 });
 
 // 11. Reset Demo Scenario

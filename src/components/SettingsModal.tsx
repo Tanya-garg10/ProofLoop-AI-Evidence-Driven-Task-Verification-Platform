@@ -117,26 +117,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </label>
           <div className="p-4 rounded-xl bg-neutral-900 border border-neutral-800 space-y-2.5 text-xs">
             <div className="flex items-center justify-between">
-              <span className="text-neutral-300">Meta Muse Spark 2.5 (Planner)</span>
-              <span className="font-mono text-[11px] text-[#22C58B]">
-                {providers?.metaMuseSpark?.status || 'CONNECTED'}
+              <span className="text-neutral-300">Meta Muse Spark 1.3 (Planner)</span>
+              <span className="font-mono text-[11px] text-neutral-300">
+                {providers?.metaMuseSpark?.status || 'CHECKING'}
               </span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-neutral-300">Meta SAM 3.1 (Segment Anything)</span>
-              <span className="font-mono text-[11px] text-[#22C58B]">
-                {providers?.metaSAM?.status || 'CONNECTED'}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-neutral-300">Gemini 3.8 Multimodal Engine</span>
-              <span className="font-mono text-[11px] text-[#7C8CFF]">
-                {providers?.geminiEngine?.status || 'CONNECTED'}
+              <span className="font-mono text-[11px] text-neutral-300">
+                {providers?.metaSAM?.status || 'CHECKING'}
               </span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-neutral-300">Meta Muse Voice Transcribe</span>
-              <span className="font-mono text-[11px] text-[#22C58B]">READY</span>
+              <span className="font-mono text-[11px] text-neutral-300">
+                {providers?.metaMuseVoice?.status || 'CHECKING'}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-neutral-300">Meta Muse Image (Optional)</span>
+              <span className="font-mono text-[11px] text-neutral-300">
+                {providers?.metaMuseImage?.status || 'CHECKING'}
+              </span>
             </div>
           </div>
         </div>

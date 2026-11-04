@@ -14,10 +14,32 @@ export interface AcceptanceCriterion {
 export interface SamDetection {
   id: string;
   label: string;
-  confidence: number;
+  confidence?: number;
   bbox: [number, number, number, number]; // [xPercent, yPercent, widthPercent, heightPercent] (0-100)
   color: string;
   attributes?: Record<string, string | number | boolean>;
+  mask?: {
+    path: string;
+    width: number;
+    height: number;
+    bounds: { left: number; top: number; right: number; bottom: number };
+  };
+}
+
+export interface AIExecutionRecord {
+  id: string;
+  requestId?: string;
+  modelName: string;
+  modelIdentifier: string;
+  operation: string;
+  inputReferences: string[];
+  outputPreview?: string;
+  status: 'RUNNING' | 'COMPLETED' | 'FAILED';
+  startedAt: string;
+  completedAt?: string;
+  durationMs?: number;
+  usage?: Record<string, number>;
+  error?: string;
 }
 
 export interface EvidenceItem {
@@ -40,7 +62,9 @@ export interface EvidenceItem {
     locationNote?: string;
     focalLength?: string;
     iso?: number;
+    analysisModel?: string;
   };
+  analysisError?: string;
 }
 
 export interface VerificationResult {
@@ -188,6 +212,10 @@ export interface AgentExecutionRecord {
   errorState?: string | null;
   targetTaskId?: string;
   targetTaskTitle?: string;
+  lastExecution?: {
+    durationMs?: number;
+    outputSummary: string;
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -251,4 +279,3 @@ export interface SpatialZone {
   evidenceUrl: string;
   taskTitle: string;
 }
-

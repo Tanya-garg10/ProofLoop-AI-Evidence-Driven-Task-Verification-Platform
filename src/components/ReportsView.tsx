@@ -171,7 +171,7 @@ export const ReportsView: React.FC = () => {
             <span className="font-bold text-white print:text-black block mb-1">
               Autonomous Multimodal Models
             </span>
-            <p>Meta Muse Spark 2.5 (Planner) · Meta SAM 3.1 (Segment Anything) · Gemini 3.8 Multimodal</p>
+            <p>Meta Muse Spark 1.3 (Planner) · Meta SAM 3.1 (Segmentation) · Muse Voice Transcribe</p>
             <p className="mt-1 font-mono text-[10px] text-neutral-500">
               Integrity: NIST FIPS 180-4 SHA-256 Verified
             </p>

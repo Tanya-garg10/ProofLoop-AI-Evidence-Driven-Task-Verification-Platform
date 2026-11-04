@@ -1,7 +1,6 @@
-import { GoogleGenAI } from '@google/genai';
 import type { AgentExecutionRecord, Task, EvidenceItem, VerificationResult } from '../../src/types/index.js';
 import { db } from '../db.js';
-import { aiServiceManager } from './aiServices.js';
+import { verifyTaskEvidence } from '../src/services/meta/verificationOrchestrator.js';
 
 class AgentOrchestrationEngine {
   private executionHistory: AgentExecutionRecord[] = [];
@@ -16,7 +15,7 @@ class AgentOrchestrationEngine {
       {
         id: 'exec-plan-01',
         role: 'PLANNING_AGENT',
-        name: 'Meta Muse Spark 2.5 Planner',
+        name: 'Meta Muse Spark 1.3 Planner',
         modelIdentifier: 'models/gemini-3.8-flash (Muse Spark Adapter)',
         currentActivity: 'Instruction Decomposition & Acceptance Criteria Generation',
         inputSummary: 'Natural language operational directive: "Prepare registration desk, arrange 50 chairs, install projector, ensure emergency exits remain unobstructed."',
@@ -96,7 +95,7 @@ class AgentOrchestrationEngine {
     const planExec: AgentExecutionRecord = {
       id: `exec-plan-${batchId}`,
       role: 'PLANNING_AGENT',
-      name: 'Meta Muse Spark 2.5 Planner',
+      name: 'Meta Muse Spark 1.3 Planner',
       modelIdentifier: 'models/gemini-3.8-flash',
       currentActivity: 'Validating acceptance criteria completeness and requirement bounds',
       inputSummary: `Task: "${task.title}" with ${task.acceptanceCriteria.length} acceptance criteria`,
@@ -164,7 +163,7 @@ class AgentOrchestrationEngine {
 
     // 4. Verification Agent (combines and invokes verification)
     const startVer = performance.now();
-    const verification = await aiServiceManager.verifyTaskEvidence(task, evidenceList);
+    const verification = await verifyTaskEvidence(task, evidenceList);
     db.addVerification(verification);
 
     const verExec: AgentExecutionRecord = {

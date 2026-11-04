@@ -6,6 +6,7 @@ import type {
   AuditLog,
   User,
   AIPlanResponse,
+  AIExecutionRecord,
   AgentExecutionRecord,
   RiskItem,
   TrustLedgerEvent,
@@ -179,6 +180,18 @@ export async function uploadPresetEvidence(
   );
 }
 
+export async function segmentEvidence(evidenceId: string, prompts: string[]): Promise<EvidenceItem> {
+  return apiRequest<EvidenceItem>(
+    `/evidence/${evidenceId}/segment`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompts }),
+    },
+    'SAM segmentation failed',
+  );
+}
+
 export async function deleteEvidence(evidenceId: string): Promise<{ success: boolean }> {
   return apiRequest<{ success: boolean }>(`/evidence/${evidenceId}`, { method: 'DELETE' }, 'Failed to delete evidence');
 }
@@ -227,8 +240,40 @@ export async function planInstructionsWithAI(
   );
 }
 
+export async function revisePlanWithAI(
+  currentPlan: AIPlanResponse,
+  revisionRequest: string,
+): Promise<AIPlanResponse> {
+  return apiRequest<AIPlanResponse>('/ai/revise', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ currentPlan, revisionRequest }),
+  }, 'AI plan revision failed');
+}
+
+export async function transcribeVoiceRecording(audio: Blob): Promise<{ transcript: string; sessionId?: string }> {
+  const formData = new FormData();
+  formData.append('audio', audio, 'recording.wav');
+  return apiRequest('/ai/transcribe', { method: 'POST', body: formData }, 'Voice transcription failed');
+}
+
 export async function fetchProviders() {
-  return apiRequest('/ai/providers', undefined, 'Failed to load provider status');
+  return apiRequest<Record<string, {
+    model: string;
+    configured: boolean;
+    status: string;
+    lastSuccessfulRequest?: string;
+    enabled?: boolean;
+    optional?: boolean;
+  }>>('/ai/status', undefined, 'Failed to load provider status');
+}
+
+export async function testAIConnection(model: 'muse-spark' | 'sam'): Promise<{ success: boolean; model: string; segmentCount?: number }> {
+  return apiRequest(`/ai/test/${model}`, { method: 'POST' }, 'AI connection test failed');
+}
+
+export async function fetchAIExecutions(): Promise<AIExecutionRecord[]> {
+  return apiRequest('/ai/executions', undefined, 'Failed to load AI execution history');
 }
 
 export async function resetDemoState() {
@@ -296,4 +341,3 @@ export async function fetchSpatialZones(): Promise<{
 }> {
   return apiRequest('/spatial/zones', undefined, 'Failed to load spatial zones');
 }
-

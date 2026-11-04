@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Sparkles,
   Mic,
@@ -13,7 +13,15 @@ import {
   FileText,
 } from 'lucide-react';
 import type { Project, AIPlanGeneratedTask, AIPlanResponse } from '../types/index.js';
-import { fetchProjects, createProject, createTask, planInstructionsWithAI } from '../lib/api.js';
+import {
+  fetchProjects,
+  createProject,
+  createTask,
+  planInstructionsWithAI,
+  revisePlanWithAI,
+  transcribeVoiceRecording,
+} from '../lib/api.js';
+import { startWavRecording, type WavRecording } from '../lib/audioRecording.js';
 
 interface AIPlannerViewProps {
   initialProject?: Project | null;
@@ -34,37 +42,63 @@ export const AIPlannerView: React.FC<AIPlannerViewProps> = ({
 
   const [isListening, setIsListening] = useState(false);
   const [voiceNotice, setVoiceNotice] = useState<string | null>(null);
+  const [voicePendingConfirmation, setVoicePendingConfirmation] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
   const [planning, setPlanning] = useState(false);
   const [planResult, setPlanResult] = useState<AIPlanResponse | null>(null);
   const [editableTasks, setEditableTasks] = useState<AIPlanGeneratedTask[]>([]);
   const [committing, setCommitting] = useState(false);
+  const [revisionRequest, setRevisionRequest] = useState('');
+  const [previousPlans, setPreviousPlans] = useState<AIPlanResponse[]>([]);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const recorder = useRef<WavRecording | null>(null);
 
   useEffect(() => {
     fetchProjects().then(setProjects).catch(console.error);
   }, []);
 
-  const handleVoiceToggle = () => {
+  const handleVoiceToggle = async () => {
+    setErrorMessage(null);
     if (!isListening) {
-      setIsListening(true);
-      setVoiceNotice('Meta Muse Voice Transcribe listening...');
-      setTimeout(() => {
-        setIsListening(false);
-        setVoiceNotice('Voice transcribed: "Conduct campus hall audit, configure projector & exits"');
-        setInstructions(
-          'Prepare the registration desk, arrange 50 chairs, install the projector, put up directional signs, and ensure emergency exits remain unobstructed.'
-        );
-      }, 2000);
-    } else {
-      setIsListening(false);
+      try {
+        recorder.current = await startWavRecording();
+        setIsListening(true);
+        setVoiceNotice('Recording. Click Stop when your instruction is complete.');
+      } catch (err) {
+        setErrorMessage(err instanceof Error ? err.message : 'Microphone could not be started.');
+      }
+      return;
+    }
+
+    setIsListening(false);
+    setTranscribing(true);
+    setVoiceNotice('Sending audio to Muse Voice Transcribe...');
+    try {
+      const recording = await recorder.current?.stop();
+      recorder.current = null;
+      if (!recording || recording.size === 44) throw new Error('The audio recording is empty.');
+      const result = await transcribeVoiceRecording(recording);
+      setInstructions(result.transcript);
+      setVoicePendingConfirmation(true);
+      setVoiceNotice('Transcript received. Edit it if needed, then confirm before planning.');
+    } catch (err) {
       setVoiceNotice(null);
+      setErrorMessage(err instanceof Error ? err.message : 'Voice transcription failed.');
+    } finally {
+      setTranscribing(false);
     }
   };
 
   const handleGeneratePlan = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!instructions.trim()) return;
+    if (voicePendingConfirmation) {
+      setErrorMessage('Confirm or edit the voice transcript before generating the plan.');
+      return;
+    }
 
     try {
+      setErrorMessage(null);
       setPlanning(true);
       const res = await planInstructionsWithAI(
         instructions.trim(),
@@ -74,7 +108,24 @@ export const AIPlannerView: React.FC<AIPlannerViewProps> = ({
       setPlanResult(res);
       setEditableTasks(res.tasks);
     } catch (err) {
-      console.error('Planning failed:', err);
+      setErrorMessage(err instanceof Error ? err.message : 'Planning failed.');
+    } finally {
+      setPlanning(false);
+    }
+  };
+
+  const handleRevisePlan = async () => {
+    if (!planResult || !revisionRequest.trim()) return;
+    try {
+      setErrorMessage(null);
+      setPlanning(true);
+      const revised = await revisePlanWithAI(planResult, revisionRequest.trim());
+      setPreviousPlans((previous) => [...previous, planResult]);
+      setPlanResult(revised);
+      setEditableTasks(revised.tasks);
+      setRevisionRequest('');
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Plan revision failed.');
     } finally {
       setPlanning(false);
     }
@@ -82,6 +133,7 @@ export const AIPlannerView: React.FC<AIPlannerViewProps> = ({
 
   const handleCommitPlan = async () => {
     try {
+      setErrorMessage(null);
       setCommitting(true);
       let targetId = selectedProjectId;
 
@@ -106,7 +158,7 @@ export const AIPlannerView: React.FC<AIPlannerViewProps> = ({
 
       onPlanCommitted(targetId);
     } catch (err) {
-      console.error('Commit plan error:', err);
+      setErrorMessage(err instanceof Error ? err.message : 'Could not save the plan.');
     } finally {
       setCommitting(false);
     }
@@ -116,6 +168,12 @@ export const AIPlannerView: React.FC<AIPlannerViewProps> = ({
     setEditableTasks((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const updateTask = (index: number, updates: Partial<AIPlanGeneratedTask>) => {
+    setEditableTasks((previous) => previous.map((task, taskIndex) =>
+      taskIndex === index ? { ...task, ...updates } : task
+    ));
+  };
+
   return (
     <div className="p-6 md:p-8 max-w-6xl mx-auto space-y-8">
       {/* Title */}
@@ -123,7 +181,7 @@ export const AIPlannerView: React.FC<AIPlannerViewProps> = ({
         <div className="flex items-center gap-2 text-xs font-medium text-[#7C8CFF] mb-1">
           <span>AI Task Decomposition</span>
           <span>·</span>
-          <span>Meta Muse Spark 2.5</span>
+          <span>Muse Spark 1.3</span>
         </div>
         <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
           AI Operational Planner
@@ -193,15 +251,16 @@ export const AIPlannerView: React.FC<AIPlannerViewProps> = ({
                 <button
                   type="button"
                   onClick={handleVoiceToggle}
+                  disabled={transcribing}
                   className={`inline-flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded transition-colors ${
                     isListening
                       ? 'bg-red-500/20 text-red-400 animate-pulse'
                       : 'text-neutral-400 hover:text-[#7C8CFF]'
                   }`}
-                  title="Meta Muse Voice Transcribe"
+                  title="Muse Voice Transcribe"
                 >
                   {isListening ? <MicOff className="w-3 h-3" /> : <Mic className="w-3 h-3" />}
-                  <span>{isListening ? 'Listening...' : 'Voice Input'}</span>
+                  <span>{transcribing ? 'Transcribing...' : isListening ? 'Stop Recording' : 'Voice Input'}</span>
                 </button>
               </div>
 
@@ -209,13 +268,27 @@ export const AIPlannerView: React.FC<AIPlannerViewProps> = ({
                 rows={5}
                 required
                 value={instructions}
-                onChange={(e) => setInstructions(e.target.value)}
+                onChange={(e) => {
+                  setInstructions(e.target.value);
+                  setVoiceNotice(null);
+                }}
                 placeholder="Enter instructions (e.g. Prepare registration desk, arrange 50 chairs, install projector, ensure emergency exits remain unobstructed)..."
                 className="w-full px-3 py-2 text-xs bg-neutral-900 border border-neutral-800 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:border-[#7C8CFF] leading-relaxed"
               />
 
-              {voiceNotice && (
-                <div className="mt-1 text-[11px] text-[#A78BFA] font-mono">{voiceNotice}</div>
+              {(voiceNotice || voicePendingConfirmation) && (
+                <div className="mt-2 text-[11px] text-[#94A3B8]">
+                  {voiceNotice || 'Review the transcript before sending it to Muse Spark.'}
+                  {voicePendingConfirmation && (
+                    <button
+                      type="button"
+                      onClick={() => setVoicePendingConfirmation(false)}
+                      className="ml-2 text-[#29D6A0] font-semibold hover:underline"
+                    >
+                      Confirm transcript
+                    </button>
+                  )}
+                </div>
               )}
             </div>
 
@@ -263,12 +336,17 @@ export const AIPlannerView: React.FC<AIPlannerViewProps> = ({
 
             <button
               type="submit"
-              disabled={planning}
+              disabled={planning || transcribing || isListening || voicePendingConfirmation}
               className="w-full py-3 text-xs font-semibold text-white bg-[#7C8CFF] hover:bg-[#6A7BFF] rounded-lg transition-all shadow-md shadow-[#7C8CFF]/20 flex items-center justify-center gap-2"
             >
               <Sparkles className={`w-3.5 h-3.5 ${planning ? 'animate-spin' : ''}`} />
-              <span>{planning ? 'Synthesizing Actionable Tasks...' : 'Generate Actionable Tasks'}</span>
+              <span>{planning ? 'Synthesizing Actionable Tasks...' : voicePendingConfirmation ? 'Confirm Voice Transcript First' : 'Generate Actionable Tasks'}</span>
             </button>
+            {errorMessage && (
+              <div role="alert" className="text-xs text-red-300 bg-red-950/30 border border-red-900/50 rounded-lg p-3">
+                {errorMessage}
+              </div>
+            )}
           </form>
         </div>
 
@@ -302,6 +380,31 @@ export const AIPlannerView: React.FC<AIPlannerViewProps> = ({
             </div>
           )}
 
+          {planResult && (
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input
+                value={revisionRequest}
+                onChange={(event) => setRevisionRequest(event.target.value)}
+                placeholder="Ask Muse Spark to revise this draft..."
+                className="flex-1 px-3 py-2 text-xs bg-neutral-900 border border-neutral-800 rounded-lg text-white placeholder-neutral-500"
+              />
+              <button
+                type="button"
+                onClick={handleRevisePlan}
+                disabled={planning || !revisionRequest.trim()}
+                className="px-3 py-2 text-xs font-semibold text-white bg-[#192232] border border-neutral-700 rounded-lg disabled:opacity-50"
+              >
+                {planning ? 'Revising...' : 'Revise draft'}
+              </button>
+            </div>
+          )}
+
+          {previousPlans.length > 0 && (
+            <div className="text-[11px] text-neutral-500">
+              Previous drafts retained in this session: {previousPlans.length}
+            </div>
+          )}
+
           {editableTasks.length === 0 ? (
             <div className="p-12 text-center rounded-2xl bg-[#111827] border border-neutral-800 space-y-3">
               <FileText className="w-8 h-8 text-neutral-500 mx-auto" />
@@ -322,7 +425,12 @@ export const AIPlannerView: React.FC<AIPlannerViewProps> = ({
                       <span className="w-6 h-6 rounded-lg bg-neutral-800 text-neutral-300 text-xs font-mono font-bold flex items-center justify-center">
                         {idx + 1}
                       </span>
-                      <h4 className="text-sm font-bold text-white">{task.title}</h4>
+                      <input
+                        value={task.title}
+                        onChange={(event) => updateTask(idx, { title: event.target.value })}
+                        aria-label={`Task ${idx + 1} title`}
+                        className="w-full bg-transparent text-sm font-bold text-white focus:outline-none border-b border-transparent focus:border-[#7C8CFF]"
+                      />
                     </div>
 
                     <button
@@ -335,9 +443,13 @@ export const AIPlannerView: React.FC<AIPlannerViewProps> = ({
                     </button>
                   </div>
 
-                  <p className="text-xs text-neutral-300 leading-relaxed">
-                    {task.description}
-                  </p>
+                  <textarea
+                    value={task.description}
+                    onChange={(event) => updateTask(idx, { description: event.target.value })}
+                    aria-label={`Task ${idx + 1} description`}
+                    rows={2}
+                    className="w-full bg-transparent text-xs text-neutral-300 leading-relaxed focus:outline-none border border-transparent focus:border-neutral-700 rounded p-1"
+                  />
 
                   {/* Criteria */}
                   <div className="space-y-1.5 pt-2 border-t border-neutral-800/80">
@@ -348,7 +460,16 @@ export const AIPlannerView: React.FC<AIPlannerViewProps> = ({
                       {task.acceptanceCriteria.map((c, cIdx) => (
                         <li key={cIdx} className="text-xs text-neutral-400 flex items-start gap-2">
                           <span className="text-neutral-600">·</span>
-                          <span>{c}</span>
+                          <input
+                            value={c}
+                            onChange={(event) => {
+                              const acceptanceCriteria = [...task.acceptanceCriteria];
+                              acceptanceCriteria[cIdx] = event.target.value;
+                              updateTask(idx, { acceptanceCriteria });
+                            }}
+                            aria-label={`Task ${idx + 1} criterion ${cIdx + 1}`}
+                            className="flex-1 bg-transparent focus:outline-none border-b border-transparent focus:border-neutral-700"
+                          />
                         </li>
                       ))}
                     </ul>
@@ -356,8 +477,22 @@ export const AIPlannerView: React.FC<AIPlannerViewProps> = ({
 
                   {/* Required Evidence */}
                   <div className="pt-2 border-t border-neutral-800/80 text-[11px] text-neutral-400">
-                    <span className="font-semibold text-neutral-300">Required Evidence:</span>{' '}
-                    {task.evidenceRequirements.join(', ')}
+                    <span className="font-semibold text-neutral-300">Required Evidence:</span>
+                    <div className="mt-1 space-y-1">
+                      {task.evidenceRequirements.map((requirement, requirementIndex) => (
+                        <input
+                          key={requirementIndex}
+                          value={requirement}
+                          onChange={(event) => {
+                            const evidenceRequirements = [...task.evidenceRequirements];
+                            evidenceRequirements[requirementIndex] = event.target.value;
+                            updateTask(idx, { evidenceRequirements });
+                          }}
+                          aria-label={`Task ${idx + 1} evidence requirement ${requirementIndex + 1}`}
+                          className="w-full bg-transparent text-[11px] text-neutral-400 focus:outline-none border-b border-transparent focus:border-neutral-700"
+                        />
+                      ))}
+                    </div>
                   </div>
                 </div>
               ))}

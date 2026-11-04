@@ -121,6 +121,9 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   };
 
   const ver = task.latestVerification;
+  const actualDetections = selectedEvidence?.metadata?.analysisModel
+    ? selectedEvidence.detections
+    : [];
 
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
@@ -404,7 +407,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
                     {/* SAM 3.1 Segmentation Bounding Box Overlays */}
                     {showSamMasks &&
-                      selectedEvidence.detections.map((det) => {
+                      actualDetections.map((det) => {
                         const [x, y, w, h] = det.bbox;
                         return (
                           <div
@@ -422,7 +425,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                               style={{ backgroundColor: det.color || '#7C8CFF' }}
                               className="absolute -top-6 left-0 px-1.5 py-0.5 text-[10px] font-bold font-mono text-black rounded shadow whitespace-nowrap"
                             >
-                              {det.label} · {Math.round(det.confidence * 100)}%
+                              {det.label}{det.confidence === undefined ? '' : ` · ${Math.round(det.confidence * 100)}%`}
                             </span>
                           </div>
                         );
@@ -449,10 +452,10 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                     {/* Detections */}
                     <div className="p-4 rounded-xl bg-[#111827] border border-neutral-800 text-xs space-y-2">
                       <span className="font-semibold text-white">
-                        SAM 3.1 Detected Segments ({selectedEvidence.detections.length})
+                        SAM 3.1 Detected Segments ({actualDetections.length})
                       </span>
                       <div className="space-y-1 max-h-28 overflow-y-auto pr-1">
-                        {selectedEvidence.detections.map((d) => (
+                        {actualDetections.length > 0 ? actualDetections.map((d) => (
                           <div
                             key={d.id}
                             className="flex items-center justify-between p-1.5 rounded bg-neutral-900 border border-neutral-800"
@@ -465,10 +468,14 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                               <span className="text-neutral-200">{d.label}</span>
                             </div>
                             <span className="font-mono text-neutral-400 text-[10px]">
-                              {Math.round(d.confidence * 100)}% Conf
+                              {d.confidence === undefined ? 'Confidence not reported' : `${Math.round(d.confidence * 100)}% Conf`}
                             </span>
                           </div>
-                        ))}
+                        )) : (
+                          <p className="text-[11px] text-neutral-500">
+                            No live SAM segmentation is available for this image.
+                          </p>
+                        )}
                       </div>
                     </div>
                   </div>

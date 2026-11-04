@@ -37,7 +37,7 @@ export class TrustLedgerService {
         action: log.action,
         relatedTaskId: log.taskId,
         relatedTaskTitle: log.taskTitle,
-        modelName: log.actorId.includes('ai') ? 'Meta Muse Spark 2.5 & SAM 3.1' : undefined,
+        modelName: log.actorId.includes('ai') ? 'Meta Muse Spark 1.3 & SAM 3.1' : undefined,
         result: log.details,
         integrityHash: hash,
         verifiedStatus: true,

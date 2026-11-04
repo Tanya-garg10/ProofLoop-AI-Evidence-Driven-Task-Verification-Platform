@@ -251,7 +251,7 @@ export const AgentControlRoomView: React.FC<AgentControlRoomViewProps> = ({
           </Surface>
         ) : (
           filteredExecutions.map((exec) => {
-            const hasError = exec.status === 'NEEDS_ATTENTION' || exec.status === 'FAILED';
+            const hasError = exec.status === 'NEEDS_ATTENTION' || exec.status === 'ERROR';
 
             return (
               <Surface

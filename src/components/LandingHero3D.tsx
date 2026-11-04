@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { motion } from 'motion';
+import { motion } from 'motion/react';
 import { ScanEye, CheckCircle2, ShieldAlert, Cpu } from 'lucide-react';
 
 export const LandingHero3D: React.FC = () => {
@@ -311,4 +311,3 @@ export const LandingHero3D: React.FC = () => {
     </div>
   );
 };
-

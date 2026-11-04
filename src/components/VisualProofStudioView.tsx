@@ -17,7 +17,7 @@ import {
   Info,
 } from 'lucide-react';
 import type { Task, EvidenceItem, SamDetection } from '../types/index.js';
-import { fetchProjectTasks, fetchTaskEvidence, uploadEvidence } from '../lib/api.js';
+import { fetchProjectTasks, fetchTaskEvidence, uploadEvidence, segmentEvidence } from '../lib/api.js';
 import {
   DisplayHeading,
   SectionHeading,
@@ -43,6 +43,9 @@ export const VisualProofStudioView: React.FC<VisualProofStudioViewProps> = ({
   const [confidenceThreshold, setConfidenceThreshold] = useState<number>(80);
   const [selectedDetection, setSelectedDetection] = useState<SamDetection | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [segmenting, setSegmenting] = useState(false);
+  const [segmentationPrompt, setSegmentationPrompt] = useState('chair');
+  const [operationError, setOperationError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const loadTasks = async () => {
@@ -71,8 +74,10 @@ export const VisualProofStudioView: React.FC<VisualProofStudioViewProps> = ({
         setEvidenceList(items);
         if (items.length > 0) {
           setActiveEvidence(items[0]);
-          if (items[0].detections.length > 0) {
+          if (items[0].metadata?.analysisModel && items[0].detections.length > 0) {
             setSelectedDetection(items[0].detections[0]);
+          } else {
+            setSelectedDetection(null);
           }
         } else {
           setActiveEvidence(null);
@@ -89,20 +94,41 @@ export const VisualProofStudioView: React.FC<VisualProofStudioViewProps> = ({
     formData.append('file', file);
 
     try {
+      setOperationError(null);
       setUploading(true);
       const newEv = await uploadEvidence(selectedTask.id, formData);
       setEvidenceList((prev) => [...prev, newEv]);
       setActiveEvidence(newEv);
     } catch (err) {
-      console.error('Upload failed:', err);
+      setOperationError(err instanceof Error ? err.message : 'Evidence upload failed.');
     } finally {
       setUploading(false);
     }
   };
 
-  const filteredDetections = (activeEvidence?.detections || []).filter(
-    (d) => Math.round(d.confidence * 100) >= confidenceThreshold
+  const handleSegment = async () => {
+    if (!activeEvidence || !segmentationPrompt.trim()) return;
+    try {
+      setOperationError(null);
+      setSegmenting(true);
+      const updated = await segmentEvidence(activeEvidence.id, [segmentationPrompt.trim()]);
+      setEvidenceList((items) => items.map((item) => item.id === updated.id ? updated : item));
+      setActiveEvidence(updated);
+      setSelectedDetection(updated.detections[0] || null);
+    } catch (err) {
+      setOperationError(err instanceof Error ? err.message : 'SAM segmentation failed.');
+    } finally {
+      setSegmenting(false);
+    }
+  };
+
+  const actualDetections = activeEvidence?.metadata?.analysisModel
+    ? activeEvidence.detections
+    : [];
+  const filteredDetections = actualDetections.filter(
+    (d) => d.confidence === undefined || Math.round(d.confidence * 100) >= confidenceThreshold
   );
+  const [imageWidth, imageHeight] = (activeEvidence?.metadata?.resolution || '').split('x').map(Number);
 
   return (
     <div className="p-6 lg:p-8 max-w-[1600px] mx-auto space-y-6 select-none">
@@ -200,8 +226,31 @@ export const VisualProofStudioView: React.FC<VisualProofStudioViewProps> = ({
               disabled={uploading}
             />
           </label>
+          <div className="flex items-center gap-1.5">
+            <input
+              value={segmentationPrompt}
+              onChange={(event) => setSegmentationPrompt(event.target.value)}
+              aria-label="SAM object prompt"
+              placeholder="One object concept"
+              className="w-32 px-2 py-1.5 text-[11px] bg-[#121824] border border-neutral-800 rounded text-white"
+            />
+            <button
+              type="button"
+              onClick={() => void handleSegment()}
+              disabled={!activeEvidence || segmenting || !segmentationPrompt.trim()}
+              className="px-2.5 py-1.5 text-[11px] font-semibold text-[#62DCEB] bg-[#121824] border border-neutral-800 rounded disabled:opacity-50"
+            >
+              {segmenting ? 'Segmenting...' : 'Segment prompt'}
+            </button>
+          </div>
         </div>
       </div>
+
+      {operationError && (
+        <div role="alert" className="p-3 text-xs text-red-300 bg-red-950/30 border border-red-900/50 rounded-lg">
+          {operationError}
+        </div>
+      )}
 
       {/* 2. Main Workstation Experience */}
       {activeEvidence ? (
@@ -216,7 +265,11 @@ export const VisualProofStudioView: React.FC<VisualProofStudioViewProps> = ({
                   <ScanEye className="w-3.5 h-3.5 text-[#62DCEB]" />
                   <span>{activeEvidence.fileName}</span>
                   <span className="text-[#64748B]">·</span>
-                  <span className="text-[#29D6A0]">{filteredDetections.length} Objects Segmented</span>
+                  <span className={activeEvidence.metadata?.analysisModel ? 'text-[#29D6A0]' : 'text-[#F2BB5B]'}>
+                    {activeEvidence.metadata?.analysisModel
+                      ? `${filteredDetections.length} Objects Segmented`
+                      : `No live segmentation (${activeEvidence.analysisStatus})`}
+                  </span>
                 </div>
                 <div className="text-[10px] text-[#94A3B8] flex items-center gap-3">
                   <span>{activeEvidence.metadata?.camera || 'Sony A7 IV'}</span>
@@ -247,11 +300,32 @@ export const VisualProofStudioView: React.FC<VisualProofStudioViewProps> = ({
                 {/* View B: SAM 3.1 Real Segmentation Overlays */}
                 {(viewMode === 'ANALYZED' || viewMode === 'SIDE_BY_SIDE') && (
                   <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
-                    <img
-                      src={activeEvidence.fileUrl}
-                      alt={activeEvidence.fileName}
-                      className="max-h-[560px] w-auto max-w-full object-contain select-none"
-                    />
+                    <div className="relative inline-block max-w-full">
+                      <img
+                        src={activeEvidence.fileUrl}
+                        alt={activeEvidence.fileName}
+                        className="block max-h-[560px] w-auto max-w-full object-contain select-none"
+                      />
+                      {imageWidth > 0 && imageHeight > 0 && (
+                        <svg
+                          viewBox={`0 0 ${imageWidth} ${imageHeight}`}
+                          preserveAspectRatio="none"
+                          className="absolute inset-0 w-full h-full pointer-events-none"
+                          aria-label="SAM segmentation masks"
+                        >
+                          {filteredDetections.map((detection) => detection.mask && (
+                            <path
+                              key={`${detection.id}-mask`}
+                              d={detection.mask.path}
+                              transform={`translate(${detection.mask.bounds.left} ${detection.mask.bounds.top}) scale(${(detection.mask.bounds.right - detection.mask.bounds.left) / detection.mask.width} ${(detection.mask.bounds.bottom - detection.mask.bounds.top) / detection.mask.height})`}
+                              fill={detection.color}
+                              fillOpacity={selectedDetection?.id === detection.id ? 0.45 : 0.27}
+                              stroke={detection.color}
+                              strokeWidth={Math.max(imageWidth / 500, 1)}
+                            />
+                          ))}
+                        </svg>
+                      )}
 
                     {/* Exact SVG and absolute BBoxes from actual database results */}
                     {filteredDetections.map((det) => {
@@ -286,14 +360,18 @@ export const VisualProofStudioView: React.FC<VisualProofStudioViewProps> = ({
                             style={{ backgroundColor: det.color || '#62DCEB' }}
                             className="absolute -top-5 left-0 px-1.5 py-0.5 text-[9px] font-bold font-mono text-[#080A10] rounded shadow whitespace-nowrap"
                           >
-                            {det.label} · {Math.round(det.confidence * 100)}%
+                            {det.label}{det.confidence === undefined ? '' : ` · ${Math.round(det.confidence * 100)}%`}
                           </span>
                         </div>
                       );
                     })}
-
-                    <div className="absolute top-2 left-2 bg-[#080A10]/90 px-2 py-0.5 rounded text-[10px] font-mono text-[#29D6A0] border border-[#29D6A0]/30">
-                      SAM 3.1 MASKS ACTIVE
+                      <div className={`absolute top-2 left-2 bg-[#080A10]/90 px-2 py-0.5 rounded text-[10px] font-mono border ${
+                        activeEvidence.metadata?.analysisModel
+                          ? 'text-[#29D6A0] border-[#29D6A0]/30'
+                          : 'text-[#F2BB5B] border-[#F2BB5B]/30'
+                      }`}>
+                        {activeEvidence.metadata?.analysisModel ? 'SAM 3.1 ANALYSIS' : `NOT ANALYZED · ${activeEvidence.analysisStatus}`}
+                      </div>
                     </div>
                   </div>
                 )}
@@ -323,7 +401,10 @@ export const VisualProofStudioView: React.FC<VisualProofStudioViewProps> = ({
                   return (
                     <div
                       key={ev.id}
-                      onClick={() => setActiveEvidence(ev)}
+                      onClick={() => {
+                        setActiveEvidence(ev);
+                        setSelectedDetection(ev.metadata?.analysisModel ? ev.detections[0] || null : null);
+                      }}
                       className={`relative rounded overflow-hidden shrink-0 w-32 h-20 border cursor-pointer transition-all ${
                         isActive
                           ? 'border-[#8B7CFF] shadow-[0_0_12px_rgba(139,124,255,0.3)] ring-1 ring-[#8B7CFF]'
@@ -418,7 +499,9 @@ export const VisualProofStudioView: React.FC<VisualProofStudioViewProps> = ({
                       {selectedDetection.label}
                     </span>
                     <span className="font-mono text-[11px] font-bold text-[#29D6A0]">
-                      {Math.round(selectedDetection.confidence * 100)}% Confidence
+                      {selectedDetection.confidence === undefined
+                        ? 'Confidence not reported'
+                        : `${Math.round(selectedDetection.confidence * 100)}% Confidence`}
                     </span>
                   </div>
 
@@ -439,7 +522,7 @@ export const VisualProofStudioView: React.FC<VisualProofStudioViewProps> = ({
 
               {/* All Detections for Current Image */}
               <div className="space-y-1 pt-1 max-h-36 overflow-y-auto">
-                {activeEvidence.detections.map((d) => (
+                {actualDetections.map((d) => (
                   <button
                     key={d.id}
                     onClick={() => setSelectedDetection(d)}
@@ -454,7 +537,7 @@ export const VisualProofStudioView: React.FC<VisualProofStudioViewProps> = ({
                       <span className="truncate">{d.label}</span>
                     </div>
                     <span className="font-mono text-[10px] text-[#29D6A0]">
-                      {Math.round(d.confidence * 100)}%
+                      {d.confidence === undefined ? '—' : `${Math.round(d.confidence * 100)}%`}
                     </span>
                   </button>
                 ))}

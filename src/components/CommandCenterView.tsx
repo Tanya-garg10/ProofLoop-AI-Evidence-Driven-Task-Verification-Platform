@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { motion } from 'motion';
+import { motion } from 'motion/react';
 import {
   Activity,
   CheckCircle2,
@@ -23,6 +23,7 @@ import {
   fetchAgentExecutions,
   fetchRiskRadar,
   fetchProjectTasks,
+  fetchProviders,
   resetDemoState,
 } from '../lib/api.js';
 import {
@@ -50,6 +51,7 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
   const [agents, setAgents] = useState<AgentExecutionRecord[]>([]);
   const [risks, setRisks] = useState<RiskItem[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [providers, setProviders] = useState<Awaited<ReturnType<typeof fetchProviders>> | null>(null);
   const [loading, setLoading] = useState(true);
   const [resetting, setResetting] = useState(false);
 
@@ -75,6 +77,9 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
 
   useEffect(() => {
     loadData();
+    fetchProviders().then(setProviders).catch((err) => {
+      console.error('AI provider status loading error:', err);
+    });
   }, []);
 
   const handleResetDemo = async () => {
@@ -381,25 +386,35 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
           {/* Small AI System Status Area */}
           <Surface className="p-4 space-y-3 bg-[#0D111B] border-[rgba(148,163,184,0.12)]">
             <div className="flex items-center justify-between border-b border-[rgba(148,163,184,0.08)] pb-2.5">
-              <span className="text-label text-[#62DCEB]">AI Engine Telemetry</span>
-              <span className="text-[10px] font-mono text-[#29D6A0]">100% OPERATIONAL</span>
+              <span className="text-label text-[#62DCEB]">Meta Model API Status</span>
+              <span className="text-[10px] font-mono text-neutral-300">
+                {providers
+                  ? Object.values(providers).some((provider) => provider.configured)
+                    ? 'API KEY CONFIGURED'
+                    : 'CONFIGURATION REQUIRED'
+                  : 'CHECKING'}
+              </span>
             </div>
 
             <div className="space-y-2 text-xs">
               <div className="flex items-center justify-between py-1 border-b border-[rgba(148,163,184,0.04)]">
                 <div className="flex items-center gap-2">
                   <Sparkles className="w-3.5 h-3.5 text-[#8B7CFF]" />
-                  <span className="text-white font-mono text-[11px]">Meta Gemini 3.8 Flash</span>
+                  <span className="text-white font-mono text-[11px]">Meta Muse Spark 1.3</span>
                 </div>
-                <span className="text-[10px] font-mono text-[#29D6A0]">ACTIVE</span>
+                <span className="text-[10px] font-mono text-neutral-300">
+                  {providers?.metaMuseSpark.status || 'CHECKING'}
+                </span>
               </div>
 
               <div className="flex items-center justify-between py-1 border-b border-[rgba(148,163,184,0.04)]">
                 <div className="flex items-center gap-2">
                   <ScanEye className="w-3.5 h-3.5 text-[#62DCEB]" />
-                  <span className="text-white font-mono text-[11px]">SAM 3.1 ViT-H Vision</span>
+                  <span className="text-white font-mono text-[11px]">Meta SAM 3.1</span>
                 </div>
-                <span className="text-[10px] font-mono text-[#29D6A0]">ACTIVE</span>
+                <span className="text-[10px] font-mono text-neutral-300">
+                  {providers?.metaSAM.status || 'CHECKING'}
+                </span>
               </div>
 
               <div className="flex items-center justify-between py-1 border-b border-[rgba(148,163,184,0.04)]">

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { motion } from 'motion';
+import { motion } from 'motion/react';
 import {
   ArrowRight,
   CheckCircle2,
@@ -185,14 +185,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               step: '02',
               title: 'AI Criteria Generation',
               subtitle: 'PLANNING STAGE',
-              desc: 'Gemini 3.8 Flash decomposes instructions into binary acceptance criteria and exact photographic evidence requirements.',
+              desc: 'Meta Muse Spark 1.3 decomposes instructions into acceptance criteria and photographic evidence requirements.',
               tag: 'Structured Acceptance Criteria',
             },
             {
               step: '03',
               title: 'SAM 3.1 Segmentation',
               subtitle: 'VISUAL REASONING',
-              desc: 'Field teams submit inspection photos. SAM 3.1 segments chairs, mounts, and clearances, calculating ground truth metrics.',
+              desc: 'Field teams submit inspection photos. Meta SAM 3.1 segments requested objects for evidence review.',
               tag: 'Spatial Object Ground Truth',
             },
             {
@@ -401,7 +401,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               Autonomous Planning & Decomposition
             </h3>
             <p className="text-xs sm:text-sm text-[#94A3B8] leading-relaxed">
-              Powered by Meta Gemini 3.8 Flash. Parses ambiguous operational directives into discrete tasks,
+              Powered by Meta Muse Spark 1.3. Parses operational directives into discrete tasks,
               assigns spatial zones, establishes dependencies, and defines exact photo verification criteria.
             </p>
           </Surface>
