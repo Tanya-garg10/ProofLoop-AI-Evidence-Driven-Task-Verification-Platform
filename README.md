@@ -6,8 +6,6 @@
 
 *From instructions to verified outcomes.*
 
----
-
 ![TypeScript](https://img.shields.io/badge/TypeScript-7.0-3178C6?style=flat-square&logo=typescript&logoColor=white)
 ![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black)
 ![Three.js](https://img.shields.io/badge/Three.js-r187-000?style=flat-square&logo=three.js)
@@ -17,8 +15,6 @@
 
 </div>
 
----
-
 ## What is ProofLoop AI?
 
 ProofLoop AI is an evidence-driven AI execution and verification platform. It turns operational directives into measurable criteria with Muse Spark, analyzes uploaded images using actual SAM 3.1 segmentations, and applies conservative evidence reasoning before routing uncertain outcomes to a human reviewer.
@@ -26,15 +22,13 @@ ProofLoop AI is an evidence-driven AI execution and verification platform. It tu
 > **Core Principle:** A task must never be marked verified just because someone clicked a checkbox.
 > Verification requires empirical, photographic, cryptographically anchored evidence.
 
----
-
 ## Architecture
 
 ```
                        ┌──────────────────────────────┐
-                       │    NATURAL LANGUAGE INPUT     │
-                       │  "Arrange 50 chairs, mount    │
-                       │   projector, clear exits..."  │
+                       │    NATURAL LANGUAGE INPUT    │
+                       │  "Arrange 50 chairs, mount   │
+                       │   projector, clear exits..." │
                        └──────────────┬───────────────┘
                                       │
               ┌───────────────────────┼───────────────────────┐
@@ -43,8 +37,8 @@ ProofLoop AI is an evidence-driven AI execution and verification platform. It tu
    │  STAGE 01        │  │  STAGE 02        │  │  STAGE 03        │
    │  Planning Agent  │  │  Visual Intel    │  │  Compliance      │
    │                  │──│                  │──│  Agent           │
-   │  Muse Spark 1.3  │  │  SAM 3.1        │  │  Muse Spark      │
-   │  Task Planning   │  │  Segmentation   │  │  Evidence Review │
+   │  Muse Spark 1.3  │  │  SAM 3.1         │  │  Muse Spark      │
+   │  Task Planning   │  │  Segmentation    │  │  Evidence Review │
    │                  │──│                  │──│  Zero-Fabrication│
    │                  │  │                  │  │  Guardrail       │
    └──────────────────┘  └──────────────────┘  └────────┬─────────┘
@@ -68,8 +62,6 @@ ProofLoop AI is an evidence-driven AI execution and verification platform. It tu
 | 03 | **Evidence Reasoner** | Muse Spark 1.3 + guardrails | Evaluates each criterion against actual segmentation findings and records uncertainty |
 | 04 | **Verification Agent** | Verification orchestrator | Routes unsupported/non-visual criteria to human review and persists review decisions |
 
----
-
 ## Tech Stack
 
 | Layer | Technology |
@@ -82,8 +74,6 @@ ProofLoop AI is an evidence-driven AI execution and verification platform. It tu
 | **Auth** | JWT (jsonwebtoken), bcryptjs |
 | **Upload** | Multer (multipart photo evidence) |
 | **Fonts** | Space Grotesk (display), Inter (interface), JetBrains Mono (code/data) |
-
----
 
 ## Modules
 
@@ -117,8 +107,6 @@ Printable executive operations compliance report with verification status breakd
 ### AI Connections
 Live Meta Model API configuration status, explicit connection tests, model IDs, last successful requests, and persisted request execution history. A model is not shown connected until a real API call succeeds.
 
----
-
 ## Demo Scenario: College Tech Fest 2026
 
 The application ships with a pre-loaded illustrative scenario. Seeded findings and verification narratives are demo data, not live model results. The Evidence Studio labels images without a real segmentation as unanalyzed; verification requires fresh API-generated segmentation.
@@ -138,8 +126,6 @@ The application ships with a pre-loaded illustrative scenario. Seeded findings a
 | Elena Rostova | `ORGANIZER` | Creates projects, enters directives, reviews reports |
 | Marcus Vance | `FIELD_INSPECTOR` | Uploads photographic evidence from the field |
 | Dr. Sarah Chen | `REVIEWER` | Final human sign-off on AI-flagged verifications |
-
----
 
 ## API Reference
 
@@ -221,8 +207,6 @@ GET  /api/ai/status                     — AI engine connectivity status
 POST /api/demo/reset                    — Reset to baseline demo state
 ```
 
----
-
 ## Getting Started
 
 ### Prerequisites
@@ -298,8 +282,6 @@ Official docs: [API overview](https://dev.meta.ai/docs/overview) · [Models](htt
 
 Run `npm test` for mocked unit tests covering planning/validation, retries and safe failures, SAM parsing/masks/zero matches, WAV transcription, verification guardrails, and review persistence. These tests do not call live Meta services. Run `npm run lint` and `npm run build` for type/build validation.
 
----
-
 ## Project Structure
 
 ```
@@ -353,39 +335,9 @@ proofloop-ai/
 └── index.html
 ```
 
----
-
-## Design System
-
-### Color Tokens
-
-| Token | Hex | Usage |
-|-------|-----|-------|
-| Background | `#080A10` | Primary app background |
-| Secondary | `#0D111B` | Card and panel backgrounds |
-| Surface | `#121824` | Elevated surface elements |
-| Elevated | `#192232` | Active states, higher elevation |
-| Violet | `#8B7CFF` | Primary brand accent |
-| Cyan | `#62DCEB` | Secondary accent, SAM 3.1 |
-| Success | `#29D6A0` | Verified, passed, active |
-| Warning | `#F2BB5B` | Needs review, uncertain |
-| Danger | `#F16D7A` | Failed, critical risk |
-
-### Typography
-
-| Font | Weight | Usage |
-|------|--------|-------|
-| **Space Grotesk** | 400–700 | Display headings, section titles |
-| **Inter** | 300–700 | Interface text, labels, body |
-| **JetBrains Mono** | 400–600 | Data readouts, IDs, status badges, code |
-
----
-
 ## License
 
 Private. All rights reserved.
-
----
 
 <div align="center">
 
