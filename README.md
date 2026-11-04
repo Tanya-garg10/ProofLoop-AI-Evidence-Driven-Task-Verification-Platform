@@ -1,6 +1,6 @@
 <div align="center">
 
-<h1>ProofLoop AI</h1>
+<h1>🔷 ProofLoop AI</h1>
 
 **THE EVIDENCE OS**
 
